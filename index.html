@@ -1,0 +1,837 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <title>Non-Backtracking Consensus Algorithm for Sensor Networks</title>
+
+    <link rel="stylesheet" href="dist/reset.css">
+    <link rel="stylesheet" href="dist/reveal.css">
+    <link rel="stylesheet" href="dist/theme/white.css">
+
+    <!-- Theme used for syntax highlighted code -->
+    <link rel="stylesheet" href="plugin/highlight/monokai.css">
+
+    <link rel="stylesheet" href="mylayout.css">
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+
+        <!-- KaTeX macros -->
+        \(
+          \gdef\lV{\left\lVert}
+          \gdef\rV{\right\rVert}
+          \gdef\VecVals#1{\bm{x}_{#1}}
+          \gdef\VecValsNV{\bm{x}}
+          \gdef\Value#1#2{x_{#1,#2}}
+          \gdef\AvgValue#1#2{\bar{x}_{#1,#2}}
+          \gdef\IdealVal{x^\star}
+          \gdef\VecUpdates#1{\Delta\bm{x}_{#1}}
+          \gdef\VecFlows#1{\bm{y}_{#1}}
+          \gdef\Flow#1#2{y_{#1,#2}}
+          \gdef\SharingRate{\varepsilon}
+          \gdef\Trans{\mathrm{T}}
+          \gdef\Laplacian{L}
+          \gdef\IncidenceMat{B}
+          \gdef\Neighbors#1{\mathcal{N}_{#1}}
+          \gdef\edge#1#2{\vec{#1#2}}
+          \gdef\NumDevices{N}
+          \gdef\IdentityMat{I}
+          \gdef\Ones{\mathbb{1}}
+          \gdef\Graph{\mathcal{G}}
+          \gdef\DiGraph{\tilde{\mathcal{G}}}
+          \gdef\CompRate{\beta}
+        \)
+        <!-- KaTeX macros end #}-->
+
+        <!-- <section id="cover"> -->
+          <section>
+            <div class="title-page">
+              <div class="title">
+                <!-- 非バックトラック性を応用した<br>センサネットワークにおける合意制御<br> -->
+                Non-Backtracking Consensus Algorithm<br>for Sensor Networks
+              </div>
+              <div class="authors"><strong>Akihito TAYA</strong></div>
+              <div class="affiliation">College of Science and Engineering, Aoyama Gakuin Univ.</div>
+              <div class="conference">SeMI/UBI/HCI@Nagoya</div>
+              <div class="date">7th Mar. 2022</div>
+            </div>
+          </section>
+          <!-- <section id="abstract">
+            <div class="page">
+              <div class="header">Abstract</div>
+              <div class="contents">
+                <svg class="annotation-layer"></svg>
+                <div class="elem-area">
+                  This paper proposes a non-backtracking consensus algorithm for sensor networks.
+                  By focusing on the amount of information flow on each edge,
+                  it is shown that backtrack occurs in basic gossip algorithms.
+                  This means that the gossip algorithm is inefficient
+                  because the backtrack prevents efficient information propagation.
+                  Therefore, the proposed algorithm adopts a term that suppresses the backtrack of flow
+                  to increase convergence speed.
+                  This paper also discusses the similarity between the non-backtracking algorithm and momentum
+                  utilized to increase the learning speed of deep neural networks.
+                  Simulation evaluations for some topologies of networks are conducted to validate the practicality of the proposed algorithm.
+                  Evaluation results show that the backtrack suppressing term improves the convergence time
+                  regardless of the topology of the networks.
+                </div>
+              </div>
+              <div class="footer"></div>
+            </div>
+          </section> -->
+
+        <section id="contents-page">
+          <div class="page">
+            <div class="header">Contents</div>
+            <div class="contents">
+              <svg class="annotation-layer"></svg>
+              <div class="elem-area">
+                <ol class="outer">
+                  <li>Background
+                    <ol class="inner">
+                      <li>What is non-backtracking?</li>
+                      <li>Applying non-backtracking algorithm for sensor networks</li>
+                    </ol>
+                  </li>
+                  <li>Problem of basic consensus algorithms
+                    <ol class="inner">
+                      <li>System model &amp; problem definition</li>
+                      <li>Basic consensus algorithm</li>
+                      <li>Propagating flows in networks</li>
+                      <li>Backtracks in basic consensus algorithm</li>
+                    </ol>
+                  </li>
+                  <li>Non-backtracking consensus algorithm
+                    <ol class="inner">
+                      <li>Suppressing backtracks</li>
+                      <li>Implementation</li>
+                      <li>Comparison with momentum</li>
+                    </ol>
+                  </li>
+                  <li>Evaluation
+                    <ol class="inner">
+                      <li>Simple simulation</li>
+                      <li>Convergence speed of various topologies</li>
+                    </ol>
+                  </li>
+                  <li>Summary</li>
+                </ol>
+              </div>
+            </div>
+            <div class="footer"></div>
+          </div>
+        </section>
+
+        <section id="background">
+          <div class="page">
+            <div class="header">What is <strong>non-backtracking</strong>?</div>
+            <div class="contents">
+              <svg class="annotation-layer"></svg>
+              <div id="bg-main" class="elem-area flex-box-column">
+                <div class="box">
+                  <div class="box-title">Non-backtracking <span class="cite">NonBT</span></div>
+                  <div class="box-area">
+                    <figure class="right">
+                      <img src="contents/backtrack.svg">
+                    </figure>
+                    <p>Do not traverse the same edge in a row.</p>
+                    <p>Non-backtracking realizes efficient propagation of data, information, etc.</p>
+                    <p><span class="label">example</span>: Alon et al. proved non-backtracking random walk converges faster than traditional ones <span class="cite">RW</span>.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="refs elem-area">
+                <ol>
+                  <li value="NonBT">小蔵正輝，“複雑ネットワーク解析における非バックトラック，”電子情報通信学会誌，vol.105，no.1，pp.27-32，Jan. 2022．</li>
+                  <li value="RW">N. Alon, I. Benjamini, E. Lubetzky, and S. Sodin, "Non-backtracking random walks mix faster," Communications in Contemporary Mathematics, vol.9, no.04, pp.585-603, May 2007.</li>
+                </ol>
+              </div>
+            </div>
+            <div class="footer"></div>
+          </div>
+        </section>
+
+        <section id="purpose">
+          <div class="page">
+            <div class="header">Applying non-backtracking algorithm for sensor networks</div>
+            <div class="contents">
+              <svg class="annotation-layer"></svg>
+              <div class="elem-area">
+                <div class="box">
+                  <div class="box-title">Purpose of this study</div>
+                  <div class="box-area">
+                    applying a non-blocking algorithm to sensor networks<br>
+                    to <strong>speed up the information propagation</strong>
+                  </div>
+                </div>
+              </div>
+              <div class="elem-area">
+                <div class="box">
+                  <div class="box-title">Target task: Consensus algorithm</div>
+                  <div class="box-area">
+                    <ul>
+                      <figure class="right">
+                        <img src="contents/systemmodel.svg">
+                      </figure>
+                      <li>Achieve consensus of sensors</li>
+                      <li>Distributed algorithm via multi-hop networks</li>
+                      <li>Many applications:<div id="app-example">distributed sensing, formation control, rendezvous</div></li>
+                      <li>An information propagating scheme that backtrack occurs (discussed in later)</li>
+                    </ul>
+                    <div class="key-points box">&RightTriangle; can be improved by non-backtracking scheme</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="footer"></div>
+          </div>
+        </section>
+
+        <section id="system-model">
+          <div class="page">
+            <div class="header">System model &amp; problem definition</div>
+            <div class="contents">
+              <svg class="annotation-layer"></svg>
+              <div class="elem-area">
+                <div>
+                  <figure class="right">
+                    <!-- <img src="contents/systemmodel.png" width="700px"> -->
+                    <img src="contents/systemmodel.svg">
+                    <svg viewbox="0 0 700 550">
+                      <!-- <polygon points="20 0, 0 550, 700 550, 700 0" stroke="#000" fill="none"></polygon> -->
+                      <foreignObject font-size="45" x="100" y="0" overflow="visible">\(\Value{1}{t}\)</foreignObject>
+                      <foreignObject font-size="45" x="10" y="380" overflow="visible">\(\Value{2}{t}\)</foreignObject>
+                      <foreignObject font-size="45" x="500" y="140" overflow="visible">\(\Value{3}{t}\)</foreignObject>
+                      <foreignObject font-size="45" x="200" y="320" overflow="visible">\(\Value{4}{t}\)</foreignObject>
+                      <foreignObject font-size="45" x="350" y="480" overflow="visible">\(\Value{5}{t}\)</foreignObject>
+                      <foreignObject font-size="45" x="600" y="260" overflow="visible">\(\Value{6}{t}\)</foreignObject>
+                      <text font-size="37" x="250" y="50">share info. with neighbors</text>
+                    </svg>
+                  </figure>
+                  <p>\(N\): Number of devices (connected via a network)</p>
+                  <p>\(\Value{i}{0}\): initial value of device \(i\)</p>
+                  <p>
+                    Devices communicate with their adjacent devices \(\Neighbors{i}\) to achieve consensus.
+                    \[\Value{i}{t+1}\leftarrow f(\{\Value{j}{t}\mid j\in\Neighbors{i}\})\]
+                  </p>
+                  <p>
+                    Goal: calculate average \(\Value{i}{t} \rightarrow \frac{1}{N} \sum_{i=1}^{N} \Value{i}{0}\)
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="footer"></div>
+          </div>
+        </section>
+
+        <section id="basic-alg">
+          <div class="page">
+            <div class="header">Basic consensus algorithm</div>
+            <div class="contents">
+              <svg class="annotation-layer"></svg>
+              <div class="elem-area">
+                Each device updates its value depending on the differences from its neighbors' values.
+              </div>
+              <div class="elem-area">
+                Scalar form:
+                \(\Value{i}{t+1} \leftarrow \Value{i}{t} + \SharingRate \sum_{j\in\Neighbors{i}} (\Value{j}{t} - \Value{i}{t})\)
+              </div>
+              <div class="elem-area">
+                Vector form:
+                \(\VecVals{t+1} \leftarrow \VecVals{t} - \SharingRate \Laplacian \VecVals{t}\)
+              </div>
+              <div class="elem-area">
+                <p>\(\Laplacian\): Graph Laplacian</p>
+                <p id="laplacian">
+                  \(\Laplacian_{ij} = \begin{cases}
+                    |\Neighbors{i}|  & \text{if } i=j \\
+                    -1               & \text{else if } j \in \Neighbors{i} \\
+                    0                & \text{otherwise.}\\
+                  \end{cases}\)
+                </p>
+              </div>
+              <div class="elem-area">
+                Convergency: 
+                \(\VecVals{t} = (\IdentityMat - \SharingRate \Laplacian)^t \VecVals{0} \rightarrow \frac{1}{{\NumDevices}} \Ones \VecVals{0}\)
+              </div>
+              <div id="laplacian-box">
+                <div class="flex-box-column">
+                  <img src="contents/small_graph.svg">
+                  <div>
+                    \[\Laplacian = \begin{bmatrix}
+                      |\Neighbors{1}| & -1 & 0 \\
+                      -1 & |\Neighbors{2}| & -1 \\
+                      0 & -1 & |\Neighbors{3}| \\
+                    \end{bmatrix}\]
+                  </div>
+                  <div>example of Laplacian</div>
+                </div>
+              </div>
+            </div>
+            <div class="footer"></div>
+          </div>
+        </section>
+
+        <section id="flows">
+          <div class="page">
+            <div class="header">Propagating flows in networks</div>
+            <div class="contents">
+              <svg class="annotation-layer">
+                <rect x="1060" y="580" width="60" height="60" fill="none" stroke="blue" stroke-width="5"></rect>
+                <rect x="1375" y="675" width="50" height="60" fill="none" stroke="blue" stroke-width="5"></rect>
+              </svg>
+              <div class="elem-area">
+                <strong class="colored">Flow</strong>
+                <span class="colored">$\Flow{\edge{i}{j}}{t}(\coloneqq\Value{i}{t}-\Value{j}{t})$</span>:
+                the amount of values moving from device \(i\) to device \(j\).
+              </div>
+              <div class="elem-area flex-box-row">
+                <div class="img-area">
+                  <img src="contents/make_digraph.png">
+                  <div class="img-caption">Creating directed graph $\DiGraph$ to analyze flow</div>
+                </div>
+                <div class="flex-box-column">
+                  <div>
+                    Incidence matrix \(\IncidenceMat\) of \(\DiGraph\):
+                    <div class="small-equations">
+                      \[\IncidenceMat_{i,\edge{j}{k}} = \begin{cases}
+                          1 & \text{if } i=j \\
+                          -1 & \text{else if } i=k \\
+                          0 & \text{otherwise.} \\
+                        \end{cases}\]
+                    </div>
+                  </div>
+                  <div>
+                    <strong>Rewrite updating functions:</strong>
+                    <div id="rewritten" class="flex-box-column">
+                      <div>
+                        <div class="small-equations">
+                          \[\VecVals{t+1} \leftarrow \VecVals{t} - \SharingRate \Laplacian \VecVals{t}\]
+                        </div>
+                      </div>
+                      <div>&DoubleDownArrow;</div>
+                      <div>
+                        <div class="small-equations">
+                          \[\begin{align}
+                            \VecFlows{t} &\leftarrow \IncidenceMat^\Trans \VecVals{t} \nonumber \\
+                            \VecVals{t+1}  &\leftarrow \VecVals{t} - \frac{1}{2} \SharingRate \IncidenceMat \VecFlows{t} \nonumber
+                          \end{align}\]
+                        </div>
+                      </div>
+                    </div>
+                    <div class="note">
+                      $\Laplacian = \frac{1}{2} \IncidenceMat \IncidenceMat^\Trans$
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="footer"></div>
+          </div>
+        </section>
+
+        <section id="problem">
+          <div class="page">
+            <div class="header">Backtracks in basic consensus algorithm</div>
+            <div class="contents">
+              <svg class="annotation-layer"></svg>
+              <div class="elem-area">
+                <figure class="right">
+                  <!-- <img src="contents/test.svg"> -->
+                  <!-- <img src="contents/backtracking_flow.svg"> -->
+                  <img src="contents/backtracking_flow.png">
+                  <!-- <div class="mxgraph" style="max-width:100%;border:1px solid transparent;" data-mxgraph="{&quot;highlight&quot;:&quot;#0000ff&quot;,&quot;nav&quot;:true,&quot;resize&quot;:true,&quot;toolbar&quot;:&quot;zoom layers tags lightbox&quot;,&quot;edit&quot;:&quot;_blank&quot;,&quot;xml&quot;:&quot;&lt;mxfile host=\&quot;Electron\&quot; modified=\&quot;2022-02-26T05:29:02.180Z\&quot; agent=\&quot;5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/16.5.1 Chrome/96.0.4664.110 Electron/16.0.7 Safari/537.36\&quot; etag=\&quot;Wp3H0_aJW0hkEMIKmbWN\&quot; version=\&quot;16.5.1\&quot; type=\&quot;device\&quot;&gt;&lt;diagram id=\&quot;V4g-PNnB7popB4cXYt4p\&quot; name=\&quot;ページ1\&quot;&gt;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&lt;/diagram&gt;&lt;/mxfile&gt;&quot;}"></div>
+                  <script type="text/javascript" src="https://viewer.diagrams.net/js/viewer-static.min.js"></script> -->
+                  <!-- </div> -->
+                </figure>
+                <div class="flex-box-column">
+                  <div>
+                    <div class="head">Step $t-1$:</div>
+                    <div class="body"><span class="red-font">Flow $\Flow{\edge{i}{j}}{t-1}=\Value{i}{t-1}-\Value{j}{t-1}$</span> moves from $\#i$ to $\#j$.</div>
+                  </div>
+                  <div>
+                    <div class="head">Step $t$:</div>
+                    <div class="body">
+                      <span class="blue-font">Flow $\Flow{\edge{j}{i}}{t}=\Value{j}{t}-\Value{i}{t}$</span> includes
+                      the previous flow <span class="red-font">flow $\Flow{\edge{i}{j}}{t-1}$</span> returning from $\#j$ to $\#i$
+                    </div>
+                  </div>
+                  <div class="spacer"></div>
+                  <div class="box">
+                    <div class="box-title">Proposed idea</div>
+                    <div class="box-area">suppress backtracks when updating devices' values</div>
+                  </div>
+                  <div class="spacer"></div>
+                </div>
+              </div>
+            </div>
+            <div class="footer"></div>
+          </div>
+        </section>
+
+        <section id="concept">
+          <div class="page">
+            <div class="header">Suppressing backtracks</div>
+            <div class="contents">
+              <svg class="annotation-layer">
+                <rect x="450" y="500" width="220" height="100" fill="none" stroke="blue" stroke-width="5"></rect>
+              </svg>
+              <div class="elem-area">
+                <div class="head">Conventional:</div>
+                <div class="body">
+                  \[\begin{align}
+                    \VecFlows{t} &\leftarrow \IncidenceMat^\Trans \VecVals{t} \nonumber \\
+                    \VecVals{t+1}  &\leftarrow \VecVals{t} - \frac{1}{2} \SharingRate \IncidenceMat \VecFlows{t} \nonumber
+                  \end{align}\]
+                </div>
+              </div>
+              <div class="elem-area">
+                <div class="head">Proposed:</div>
+                <div class="body">
+                  \[\begin{align}
+                    \VecFlows{t} &\leftarrow \IncidenceMat^\Trans \VecVals{t} + 2\CompRate\VecFlows{t-1}\nonumber \\
+                    \VecVals{t+1}  &\leftarrow \VecVals{t} - \frac{1}{2} \SharingRate \IncidenceMat \VecFlows{t} \nonumber
+                  \end{align}\]
+                </div>
+              </div>
+              <div class="notes key-points">
+                Add a term $2 \CompRate \VecFlows{t-1}$ to suppress backtracking flow.
+              </div>
+            </div>
+            <div class="footer"></div>
+          </div>
+        </section>
+
+        <section id="mv-avg">
+          <div class="page">
+            <div class="header">Implementation</div>
+            <div class="contents">
+              <svg class="annotation-layer"></svg>
+              <div class="elem-area">
+                <div class="head">Proposed flows can be calculated as follows:</div>
+                <div id="flow-derive" class="math">
+                  \[
+                  \begin{align}
+                    \VecFlows{t}
+                      &= \IncidenceMat^\Trans \VecVals{t} + 2\CompRate (\IncidenceMat^\Trans \VecVals{t-1} + 2\CompRate\VecFlows{t-2}) \nonumber \\
+                      &= \sum_{\tau=0}^{t}(2\beta)^\tau \IncidenceMat^\Trans \VecVals{t-\tau} \nonumber
+                  \end{align}
+                  \]
+                </div>
+              </div>
+              <div class="elem-area">
+                <div class="head">Values $\VecVals{t}$ are updated as follows:</div>
+                <div class="body">
+                  <div class="flex-box-column">
+                    <div class="flex-box-row">
+                      <div>Vector form:</div>
+                      <div class="math">
+                          $\VecVals{t+1} \leftarrow \VecVals{t} - \SharingRate \Laplacian \sum_{\tau=0}^{t}(2\beta)^\tau \VecVals{t-\tau}$
+                      </div>
+                    </div>
+                    <div class="flex-box-row">
+                      <div>Scalar form:</div>
+                      <div>
+                        <div class="math">
+                            $\Value{i}{t+1} \leftarrow \Value{i}{t} + \SharingRate \sum_{j\in\Neighbors{i}} (\AvgValue{j}{t} - \AvgValue{i}{t})$
+                        </div>
+                        <div class="math">
+                          where
+                            $\AvgValue{i}{t} \coloneqq \sum_{\tau=0}^{t}(2\beta)^\tau \Value{i}{t-\tau}$
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="note">
+                  Conventional:<br>
+                  $\VecVals{t+1} \leftarrow \VecVals{t} - \SharingRate \Laplacian \VecVals{t}$
+                </div>
+              </div>
+              <div class="elem-area">
+                <div class="box key-points">
+                  Values can be calculated without the flow $\Flow{\edge{i}{j}}{t}$ on each edge.
+                </div>
+              </div>
+            </div>
+            <div class="footer"></div>
+          </div>
+        </section>
+
+        <section id="momentum">
+          <div class="page">
+            <div class="header">Comparison with momentum</div>
+            <div class="contents">
+              <svg class="annotation-layer">
+                <rect x="600" y="160" width="330" height="90" fill="none" stroke="blue" stroke-width="5"></rect>
+                <rect x="980" y="160" width="200" height="90" fill="none" stroke="green" stroke-width="5"></rect>
+                <rect x="680" y="490" width="160" height="90" fill="none" stroke="blue" stroke-width="5"></rect>
+                <rect x="880" y="490" width="220" height="90" fill="none" stroke="green" stroke-width="5"></rect>
+              </svg>
+              <div class="elem-area">
+                <strong>Momentum</strong>: an acceleration method for stochastic gradient descent
+                <div class="math">
+                  \[\begin{align}
+                    \bm{w}_{t+1} &\leftarrow \bm{w}_{t} + \Delta \bm{w}_{t} \nonumber \\
+                    \Delta \bm{w}_{t} &\leftarrow - \eta \nabla Loss(\bm{w}_{t}) + \mu \Delta \bm{w}_{t-1} \nonumber \\
+                  \end{align}\]
+                </div>
+              </div>
+              <div class="elem-area line"></div>
+              <div class="elem-area">
+                <div><strong>Non-backtracking consensus algorithm</strong></div>
+                <div>$\VecUpdates{t}$: the amount of updates</div>
+                <div class="math">\[\VecUpdates{t} \leftarrow - \SharingRate \Laplacian \VecVals{t} + 2\CompRate \VecUpdates{t-1}\]</div>
+              </div>
+              <div class="elem-area">
+                <div class="flex-box-row">
+                  <div>&blacktriangleright; optimizing </div>
+                  <div class="math">
+                    \[\min_{\VecValsNV} \lV \IncidenceMat^\Trans\VecValsNV\rV^2\]
+                  </div>
+                  <div class="math">
+                      $\text{s.t. } \sum_i^{N} x_i = \text{const.}$
+                  </div>
+                </div>
+              </div>
+              <div class="float">
+                \[\nabla_{\VecValsNV} \lV \IncidenceMat^\Trans\VecValsNV\rV^2 = 4 \Laplacian \VecValsNV\]
+              </div>
+            </div>
+            <div class="footer"></div>
+          </div>
+        </section>
+
+        <section id="eval-simple">
+          <div class="page">
+            <div class="header">Evaluation: Simple simulation</div>
+            <div class="contents">
+              <svg class="annotation-layer">
+              </svg>
+              <div class="elem-area">
+                <figure class="eval-simple-fig">
+                  <div class="flex-box-row">
+                    <div>
+                      <img src="contents/convergence-conv.png">
+                      <div class="caption red-font">Conventional</div>
+                    </div>
+                    <div>
+                      <img src="contents/convergence-prop.png">
+                      <div class="caption blue-font">Proposed</div>
+                    </div>
+                    <div class="params">
+                      <div>$N$: 10</div>
+                      <div>$\SharingRate$: 0.19</div>
+                      <div>$\CompRate$ (poposed): 0.4</div>
+                      <div>Initial values: 0, ..., 9</div>
+                    </div>
+                  </div>
+                </figure>
+                <div class="eval-topolgy">
+                  <img src="contents/2cl_network.svg">
+                </div>
+                <div class="eval-comment">
+                  <div class="label red-font">Conventional:</div>
+                  <ul>
+                    <li>Converges within each cluster at first.</li>
+                  </ul>
+                  <div class="label blue-font">Proposed:</div>
+                  <ul>
+                    <li>Converges faster because flows across two clusters.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="footer"></div>
+          </div>
+        </section>
+<!--  -->
+        <section id="eval-concept">
+          <div class="page">
+            <div class="header">Evaluation: trial</div>
+            <div class="contents">
+              <svg class="annotation-layer">
+              </svg>
+              <div class="elem-area">
+                <div class="flex-box-column">
+                  <div id="params-area">
+                    <div class="flex-box-column param-box">
+                      <div class="flex-box-column">
+                        <div class="param-label">Initial values:</div>
+                        <div class="flex-box-row params init-values">
+                          <input type="number" step="0.001" name="val0" id="prm-val0" value="0">
+                          <input type="number" step="0.001" name="val1" id="prm-val1" value="1">
+                          <input type="number" step="0.001" name="val2" id="prm-val2" value="2">
+                          <input type="number" step="0.001" name="val3" id="prm-val3" value="3">
+                          <input type="number" step="0.001" name="val4" id="prm-val4" value="4">
+                          <input type="number" step="0.001" name="val5" id="prm-val5" value="5">
+                          <input type="number" step="0.001" name="val6" id="prm-val6" value="6">
+                          <input type="number" step="0.001" name="val7" id="prm-val7" value="7">
+                          <input type="number" step="0.001" name="val8" id="prm-val8" value="8">
+                          <input type="number" step="0.001" name="val9" id="prm-val9" value="9">
+                        </div>
+                      </div>
+                    </div>
+                    <div class="flex-box-column param-box">
+                      <div class="flex-box-row">
+                        <div class="param-label">$\SharingRate$:</div>
+                        <div class="params">
+                          <input type="number" step="0.01" name="epsilon" id="prm-eps" value="0.19">
+                        </div>
+                        <div class="param-label">$\CompRate$:</div>
+                        <div class="params">
+                          <input type="number" step="0.01" name="beta" id="prm-beta" value="0.4">
+                        </div>
+                        <div class="param-label">Frame rate:</div>
+                        <div class="params">
+                          <input type="number" step="1" name="speed" id="prm-fps" value="1">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- <div class="spacer"></div> -->
+                  <div id="canvas-area">
+                    <div class="flex-box-column">
+                      <div>
+                        <div class="flex-box-row">
+                          <div class="canvas-set">
+                            <canvas id="eval-canvas-conv">Canvas is not available.</canvas>
+                            <div class="caption">Conventional</div>
+                          </div>
+                          <div class="canvas-set">
+                            <canvas id="eval-canvas-prop">Canvas is not available.</canvas>
+                            <div class="caption">Proposed</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="flex-box-row">
+                        <button id="eval-start">start</button>
+                        <button id="eval-stop">stop</button>
+                        <button id="eval-cmap">cmap</button>
+                        <div id="cmap-state">absolute</div>
+                        <div id="eval-cnt-label">Time: </div>
+                        <div id="eval-counter">0</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="footer"></div>
+          </div>
+        </section>
+<!--  -->
+
+        <section id="sim-settings">
+          <div class="page">
+            <div class="header">Evaluation: Convergence speed of various topologies</div>
+            <div class="contents">
+              <svg class="annotation-layer"></svg>
+              <div class="elem-area full-height">
+                <div class="flex-box-column">
+                  <div id="def-convtime">
+                    <div><strong>Convergence time</strong>:</div>
+                    <div class="indent">$\displaystyle{\min_t \{ \max_i \{|\Value{i}{t} - \IdealVal|\} \} < 10^{-10}}$</div>
+                    <div class="indent">where $\IdealVal = \frac{1}{N}\sum_i^{N} \Value{i}{0}$</div>
+                  </div>
+                  <div id="prm-values">
+                    <div>Num. devices: $N=100$</div>
+                    <div>Initial values: $\Value{i}{0} \in [0, 10]$ (uniformaly random)</div>
+                    <div>Topologies:</div>
+                    <div class="indent">2D lattice, lattice ring, Watts Strogatz model <span class="cite">WS</span>, Barabási Albert model <span class="cite">BA</span></div>
+                  </div>
+                </div>
+              </div>
+              <div class="refs elem-area">
+                <ol>
+                  <li value="WS">D.J. Watts and S.H. Strogatz, "Collective dynamics of 'small-world' networks," Nature, vol.393, no.6684, pp.440-442, June 1998.</li>
+                  <li value="BA">A.-L. Barabási and R. Albert, "Emergence of scaling in random networks," Science, vol.286, no.5439, pp.509-512, Oct. 1999.</li>
+                </ol>
+              </div>
+            </div>
+            <div class="footer"></div>
+          </div>
+        </section>
+
+        <section id="eval-beta-pl">
+          <div class="page">
+            <div class="header">2D lattice</div>
+            <div class="contents">
+              <svg class="annotation-layer">
+                <polyline points="160 670, 180 650, 200 670" fill="red" stroke="red" stroke-width="1"></polyline>
+                <path d="M 180 660 V 700" stroke="red" stroke-width="7"></path>
+                <text class="conv" x="50" y="750">Conventional</text>
+                <path d="M 210 640 Q 210 660, 230 660 L 920 660 Q 940 660, 940 640" fill="none" stroke="blue" stroke-width="7"></path>
+                <text class="prop" x="630" y="720">Proposed</text>
+              </svg>
+              <div class="elem-area">
+                <figure class="eval-fig">
+                  <img src="contents/pl.png">
+                </figure>
+                <div class="flex-box-column eval-side">
+                  <div class="eval-topolgy">
+                    <img src="contents/topo-dl.png">
+                  </div>
+                  <div class="eval-comment">
+                    <ul>
+                      <li>Convergence speed increases with $\CompRate (< 0.5)$.</li>
+                      <li>When $\CompRate \ge 0.5$, values diverge to $\infty$.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="footer"></div>
+          </div>
+        </section>
+
+        <section id="eval-beta-lr">
+          <div class="page">
+            <div class="header">2D lattice ring</div>
+            <div class="contents">
+              <svg class="annotation-layer">
+              </svg>
+              <div class="elem-area">
+                <figure class="eval-fig">
+                  <img src="contents/rl.png">
+                </figure>
+                <div class="flex-box-column eval-side">
+                  <div class="eval-topolgy">
+                    <img src="contents/topo-rl.svg">
+                  </div>
+                  <div class="eval-comment">
+                    <ul>
+                      <li>Convergence property is similar to that of 2D lattice.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="footer"></div>
+          </div>
+        </section>
+
+        <section id="eval-beta-WS">
+          <div class="page">
+            <div class="header">Watts-Strogatz model</div>
+            <div class="contents">
+              <svg class="annotation-layer"></svg>
+              <div class="elem-area">
+                <figure class="eval-fig">
+                  <img src="contents/ws.png">
+                </figure>
+                <div class="flex-box-column eval-side">
+                  <div class="eval-topolgy">
+                    <img src="contents/topo-ws.png">
+                  </div>
+                  <div class="eval-comment">
+                    <ul>
+                      <li>Small-world model (short average path length &amp; high clustering)</li>
+                      <li>Similar convergence property to lattice topologies</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="footer"></div>
+          </div>
+        </section>
+
+        <section id="eval-beta-ba">
+          <div class="page">
+            <div class="header">Barabasi-Albert model</div>
+            <div class="contents">
+              <svg class="annotation-layer"></svg>
+              <div class="elem-area">
+                <figure class="eval-fig">
+                  <img src="contents/ba.png">
+                </figure>
+                <div class="flex-box-column eval-side">
+                  <div class="eval-topolgy">
+                    <img src="contents/topo-ba.png">
+                  </div>
+                  <div class="eval-comment">
+                    <ul>
+                      <li>Scale free model (Few nodes have high degree.)</li>
+                      <li>Similar convergence property to lattice topologies</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="footer"></div>
+          </div>
+        </section>
+
+        <section id="summary">
+          <div class="page">
+            <div class="header">Summary</div>
+            <div class="contents">
+              <svg class="annotation-layer"></svg>
+              <div class="elem-area">
+                <ul>
+                  <li>A non-backtracking consensus algorithm is proposed for sensor networks.</li>
+                  <li>The proposed algorithm converges faster than conventional ones by surpressing the backtracking flows.</li>
+                  <li>It can be implemented without additional costs of storing large data.</li>
+                  <li>A similarity can be seen between the proposed algorithm and the momentum.</li>
+                </ul>
+              </div>
+            </div>
+            <div class="footer"></div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script src="dist/reveal.js"></script>
+    <script src="plugin/notes/notes.js"></script>
+    <script src="plugin/markdown/markdown.js"></script>
+    <script src="plugin/highlight/highlight.js"></script>
+    <script src="plugin/math/math.js"></script>
+    <script>
+      // More info about initialization & config:
+      // - https://revealjs.com/initialization/
+      // - https://revealjs.com/config/
+      Reveal.initialize({
+        hash: true,
+        width: 1600,
+        height: 900,
+        margin: 0.06,
+        center: false,
+        // disableLayout: true, // disable auto scaling and centering
+        slideNumber: 'h.v',
+        markdown: true,
+        history: true,
+
+        katex: {
+          version: 'latest',
+          delimiters: [
+            { left: '$$', right: '$$', display: true },
+            { left: '$', right: '$', display: false },
+            { left: '\\(', right: '\\)', display: false },
+            { left: '\\[', right: '\\]', display: true }
+          ],
+          macros: {
+            VecVals: "{x}",
+            SharingRate: "{\\varepsilon}",
+            Laplacian: "{L}",
+            Value: "{x}",
+            Neighbors: "{\\mathcal{N}}",
+          },
+          ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+        },
+
+        // Learn about plugins: https://revealjs.com/plugins/
+        plugins: [ RevealMarkdown, RevealHighlight, RevealNotes, RevealMath.KaTeX ]
+      });
+    </script>
+    <script src="js/footer.js"></script>
+    <script src="js/refs.js"></script>
+    <script src="js/eval-animation.js"></script>
+    <script src="js/set-svg.js"></script>
+    <!-- <script src="js/debug-mode.js"></script> -->
+  </body>
+</html>
