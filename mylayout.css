@@ -3,6 +3,10 @@
   --r-main-font: Arial, Helvetica, sans-serif;
 }
 
+body {
+  cursor: url(contents/mouse-pointer.cur), auto;
+}
+
 div.title-page {
   display: grid;
   grid-template-rows: 400px 100px 100px 150px 80px 1fr;
